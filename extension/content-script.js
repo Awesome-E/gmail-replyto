@@ -1,7 +1,7 @@
 (() => {
   const base = document.baseURI.match(/^http.*\/u\/\d+/)?.at(0)
   const initialSender = {}
-  let composer
+  const composers = []
   let currentReplyTo = ''
 
   function updateDetails (at, cfa, cfn, cfrt) {
@@ -17,6 +17,14 @@
     const [at, cfa, cfn, cfrt] = ['at', 'cfa', 'cfn', 'cfrt']
       .map(key => shadow.querySelector(`[name="${key}"]`)?.value)
     return Object.assign(initialSender, { at, cfa, cfn, cfrt })
+  }
+
+  function updateSelectOptions (select) {
+    const [defaultOpt] = select.options
+    const newValue = currentReplyTo || 'Same as sender'
+    defaultOpt.innerText = `Default (${defaultOpt.value = newValue})`
+    // Since the latest reply to address change was just saved, set the select to its default
+    select.value = defaultOpt.value
   }
 
   async function addReplyAddressField (composer) {
@@ -48,6 +56,8 @@
       el.innerText = opt
       el.value = val || opt
     })
+
+    document.body.addEventListener('_emailsent', () => updateSelectOptions(select))
   }
 
   function resetReplyTo () {
@@ -65,9 +75,10 @@
       const addedComposer = addedNodes.find(findComposer)
       if (addedComposer) {
         addReplyAddressField(addedComposer)
-        composer = addedComposer
+        composers.push(addedComposer)
+        console.log(composers)
       }
-      const removedComposer = removedNodes.find(el => el === composer)
+      const removedComposer = removedNodes.find(el => composers.includes(el))
       if (removedComposer) resetReplyTo()
     })
     observer.observe(document.body, { childList: true, subtree: true })
@@ -95,6 +106,7 @@
     Composer.prototype.send = function (...args) {
       initialSender.cfrt = currentReplyTo
       original.apply(this, args)
+      document.body.dispatchEvent(new CustomEvent('_emailsent'))
     }
   }
   window.addEventListener('load', () => { patchInterval = setInterval(patchSend, 50) })
